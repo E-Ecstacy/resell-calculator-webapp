@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit Calculator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>📊 Calculate Your Profit</h2>
+        
+        <form method="POST" action="/calculate">
+            <div class="form-group">
+                <label>📦 Product Name:</label>
+                <input type="text" name="product_name" placeholder="e.g., Nike Shoes, iPhone 12" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🔢 Quantity:</label>
+                <input type="number" name="quantity" value="1" min="1" placeholder="How many units?" required>
+            </div>
+            
+            <div class="form-group">
+                <label>💵 Cost Price (per unit):</label>
+                <input type="number" step="0.01" name="cost" placeholder="Enter what you paid per unit" required>
+            </div>
+            
+            <div class="form-group">
+                <label>💰 Selling Price (per unit):</label>
+                <input type="number" step="0.01" name="sell" placeholder="Enter selling price per unit" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🏪 Platform:</label>
+                <select name="platform">
+                    <option value="ebay">eBay (12.9% fee)</option>
+                    <option value="vinted">Vinted (5% fee)</option>
+                    <option value="depop">Depop (10% fee)</option>
+                </select>
+            </div>
+            
+            <button type="submit">Calculate Profit</button>
+        </form>
+        
+        <div class="links">
+            <a href="/">← Back to Home</a>
+        </div>
+    </div>
+</body>
+</html>

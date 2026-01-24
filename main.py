@@ -1,0 +1,303 @@
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+import csv
+import os
+from datetime import datetime
+import pandas as pd
+import sqlite3
+import json
+
+app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this-to-random-string'  # CHANGE THIS!
+
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Database setup
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT UNIQUE NOT NULL,
+                  email TEXT UNIQUE NOT NULL,
+                  password TEXT NOT NULL)''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# User class
+class User(UserMixin):
+    def __init__(self, id, username, email):
+        self.id = id
+        self.username = username
+        self.email = email
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    user = c.fetchone()
+    conn.close()
+    if user:
+        return User(user[0], user[1], user[2])
+    return None
+
+# Ensure user-specific data.csv exists
+def get_user_csv_path(username):
+    user_folder = f'data/{username}'
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
+    csv_path = f'{user_folder}/data.csv'
+    if not os.path.exists(csv_path):
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['product_name', 'quantity', 'cost', 'sell', 'platform', 'profit', 'total_profit', 'date'])
+    return csv_path
+
+@app.route('/')
+def home():
+    return render_template('home.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+        
+        # Validate
+        if len(username) < 3:
+            flash('Username must be at least 3 characters long', 'error')
+            return redirect(url_for('register'))
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return redirect(url_for('register'))
+        
+        # Hash password
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        
+        # Save to database
+        try:
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                     (username, email, hashed_password))
+            conn.commit()
+            conn.close()
+            
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            flash('Username or email already exists', 'error')
+            return redirect(url_for('register'))
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT * FROM users WHERE username = ?', (username,))
+        user = c.fetchone()
+        conn.close()
+        
+        if user and check_password_hash(user[3], password):
+            user_obj = User(user[0], user[1], user[2])
+            login_user(user_obj)
+            flash('Login successful!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+            return redirect(url_for('login'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out', 'success')
+    return redirect(url_for('home'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    return render_template('dashboard.html', username=current_user.username)
+
+@app.route('/history')
+@login_required
+def history():
+    csv_path = get_user_csv_path(current_user.username)
+    flips = []
+    try:
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Ensure all values are properly formatted
+                row['cost'] = float(row.get('cost', 0))
+                row['sell'] = float(row.get('sell', 0))
+                row['quantity'] = int(row.get('quantity', 1))
+                row['profit'] = float(row.get('profit', 0))
+                row['total_profit'] = float(row.get('total_profit', 0))
+                flips.append(row)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    
+    # Prepare chart data
+    chart_labels = [flip['product_name'] for flip in flips]
+    chart_profits = [flip['total_profit'] for flip in flips]
+    chart_data = json.dumps({'labels': chart_labels, 'profits': chart_profits})
+    
+    return render_template('history.html', flips=flips, chart_data=chart_data)
+
+@app.route('/calculator')
+@login_required
+def calculator():
+    return render_template('calculator.html')
+
+@app.route('/calculate', methods=['POST'])
+@login_required
+def calculate():
+    csv_path = get_user_csv_path(current_user.username)
+    
+    product_name = request.form['product_name']
+    quantity = int(request.form['quantity'])
+    cost = float(request.form['cost'])
+    sell = float(request.form['sell'])
+    platform = request.form['platform']
+    
+    fees = {'ebay': 0.129, 'vinted': 0.05, 'depop': 0.10}
+    fee = sell * fees[platform]
+    profit = sell - cost - fee
+    total_profit = profit * quantity
+    
+    # Save to CSV
+    with open(csv_path, 'a', newline='') as f:
+        writer = csv.writer(f)
+        date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        writer.writerow([product_name, quantity, cost, sell, platform, round(profit, 2), round(total_profit, 2), date])
+    
+    return render_template('results.html', 
+                         product_name=product_name,
+                         quantity=quantity,
+                         cost=cost, 
+                         sell=sell,
+                         platform=platform, 
+                         fee=fee, 
+                         profit=profit)
+
+@app.route('/edit/<int:index>')
+@login_required
+def edit(index):
+    csv_path = get_user_csv_path(current_user.username)
+    flips = []
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        flips = list(reader)
+    
+    if index < len(flips):
+        return render_template('edit.html', flip=flips[index], index=index)
+    else:
+        return redirect(url_for('history'))
+
+@app.route('/update/<int:index>', methods=['POST'])
+@login_required
+def update(index):
+    csv_path = get_user_csv_path(current_user.username)
+    
+    product_name = request.form['product_name']
+    quantity = int(request.form['quantity'])
+    cost = float(request.form['cost'])
+    sell = float(request.form['sell'])
+    platform = request.form['platform']
+    
+    fees = {'ebay': 0.129, 'vinted': 0.05, 'depop': 0.10}
+    fee = sell * fees[platform]
+    profit = sell - cost - fee
+    total_profit = profit * quantity
+    
+    # Read all rows
+    flips = []
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        flips = list(reader)
+    
+    # Update the specific row
+    if index < len(flips):
+        date = flips[index].get('date', datetime.now().strftime('%Y-%m-%d %H:%M'))
+        flips[index] = {
+            'product_name': product_name,
+            'quantity': quantity,
+            'cost': cost,
+            'sell': sell,
+            'platform': platform,
+            'profit': round(profit, 2),
+            'total_profit': round(total_profit, 2),
+            'date': date
+        }
+    
+    # Write back to CSV
+    with open(csv_path, 'w', newline='') as f:
+        fieldnames = ['product_name', 'quantity', 'cost', 'sell', 'platform', 'profit', 'total_profit', 'date']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(flips)
+    
+    return redirect(url_for('history'))
+
+@app.route('/delete/<int:index>')
+@login_required
+def delete(index):
+    csv_path = get_user_csv_path(current_user.username)
+    
+    # Read all rows
+    flips = []
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        flips = list(reader)
+    
+    # Remove the specific row
+    if index < len(flips):
+        flips.pop(index)
+    
+    # Write back to CSV
+    with open(csv_path, 'w', newline='') as f:
+        fieldnames = ['product_name', 'quantity', 'cost', 'sell', 'platform', 'profit', 'total_profit', 'date']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(flips)
+    
+    return redirect(url_for('history'))
+
+@app.route('/export')
+@login_required
+def export():
+    csv_path = get_user_csv_path(current_user.username)
+    
+    # Read CSV and convert to Excel
+    df = pd.read_csv(csv_path)
+    
+    # Create Excel file
+    excel_filename = f'flip_history_{current_user.username}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    df.to_excel(excel_filename, index=False, engine='openpyxl')
+    
+    return send_file(excel_filename, 
+                    as_attachment=True,
+                    download_name=excel_filename,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+if __name__ == '__main__':
+    app.run(debug=True)

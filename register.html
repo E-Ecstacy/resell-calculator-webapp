@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Profit Calculator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>📝 Create Your Account</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="/register">
+            <div class="form-group">
+                <label>👤 Username:</label>
+                <input type="text" name="username" placeholder="Choose a username (min 3 characters)" required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label>📧 Email:</label>
+                <input type="email" name="email" placeholder="your@email.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🔑 Password:</label>
+                <input type="password" name="password" placeholder="Choose a password (min 6 characters)" required>
+            </div>
+            
+            <button type="submit">Create Account</button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <p>Already have an account? <a href="/login" style="color: #667eea; text-decoration: underline;">Login here</a></p>
+        </div>
+        
+        <div class="links">
+            <a href="/">← Back to Home</a>
+        </div>
+    </div>
+</body>
+</html>

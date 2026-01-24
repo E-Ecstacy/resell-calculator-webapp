@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Entry</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>✏️ Edit Flip Entry</h2>
+        
+        <form method="POST" action="/update/{{ index }}">
+            <div class="form-group">
+                <label>📦 Product Name:</label>
+                <input type="text" name="product_name" value="{{ flip.product_name }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🔢 Quantity:</label>
+                <input type="number" name="quantity" value="{{ flip.quantity }}" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label>💵 Cost Price (per unit):</label>
+                <input type="number" step="0.01" name="cost" value="{{ flip.cost }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>💰 Selling Price (per unit):</label>
+                <input type="number" step="0.01" name="sell" value="{{ flip.sell }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🏪 Platform:</label>
+                <select name="platform">
+                    <option value="ebay" {% if flip.platform == 'ebay' %}selected{% endif %}>eBay (12.9% fee)</option>
+                    <option value="vinted" {% if flip.platform == 'vinted' %}selected{% endif %}>Vinted (5% fee)</option>
+                    <option value="depop" {% if flip.platform == 'depop' %}selected{% endif %}>Depop (10% fee)</option>
+                </select>
+            </div>
+            
+            <button type="submit">Update Entry</button>
+        </form>
+        
+        <div class="links">
+            <a href="/history">← Back to History</a>
+        </div>
+    </div>
+</body>
+</html>
