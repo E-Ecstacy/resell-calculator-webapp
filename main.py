@@ -7,9 +7,33 @@ from datetime import datetime
 import pandas as pd
 import sqlite3
 import json
+import stripe
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.ext.declarative import declarative_base
+from flask_mail import Mail, Message
+
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-to-random-string'  # CHANGE THIS!
+
+
+app.secret_key = 'your-secret-key-here-random-string-123'
+
+stripe.api_key = 'sk_test_...'  # Use test key, not live
+STRIPE_PUBLISHABLE_KEY = 'pk_test_...'  # Use test key
+
+DATABASE_PATH = os.environ.get('DATABASE_PATH', 'users.db')
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+engine = create_engine(DATABASE_URL)
+db_session = scoped_session(sessionmaker(bind=engine))
+Base = declarative_base()
+
+
+
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -21,14 +45,40 @@ def init_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  username TEXT UNIQUE NOT NULL,
-                  email TEXT UNIQUE NOT NULL,
-                  password TEXT NOT NULL)''')
+             (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT UNIQUE NOT NULL,
+              email TEXT UNIQUE NOT NULL,
+              password TEXT NOT NULL,
+              subscription_status TEXT DEFAULT 'free',
+              stripe_customer_id TEXT)''')
     conn.commit()
     conn.close()
 
 init_db()
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.environ.get('STRIPE_WEBHOOK_SECRET')
+        )
+    except ValueError:
+        return 'Invalid payload', 400
+    except stripe.error.SignatureVerificationError:
+        return 'Invalid signature', 400
+    
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        # Update user subscription
+        
+    elif event['type'] == 'customer.subscription.deleted':
+        # Downgrade user to free
+        pass
+    
+    return {'status': 'success'}
 
 # User class
 class User(UserMixin):
@@ -59,6 +109,28 @@ def get_user_csv_path(username):
             writer = csv.writer(f)
             writer.writerow(['product_name', 'quantity', 'cost', 'sell', 'platform', 'profit', 'total_profit', 'date'])
     return csv_path
+
+def check_flip_limit(username):
+    csv_path = get_user_csv_path(username)
+    try:
+        with open(csv_path, 'r') as f:
+            flip_count = len(f.readlines()) - 1  # Minus header
+    except:
+        flip_count = 0
+    
+    # Get subscription status
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT subscription_status FROM users WHERE username = ?', (username,))
+    result = c.fetchone()
+    conn.close()
+    
+    status = result[0] if result else 'free'
+    
+    if status == 'free' and flip_count >= 10:
+        return False  # Hit limit
+    return True  # Can still add flips
+
 
 @app.route('/')
 def home():
@@ -171,6 +243,9 @@ def calculator():
 @app.route('/calculate', methods=['POST'])
 @login_required
 def calculate():
+    if not check_flip_limit(current_user.username):
+        flash('Free limit reached (10 flips). Upgrade to continue!', 'error')
+        return redirect(url_for('upgrade'))
     csv_path = get_user_csv_path(current_user.username)
     
     product_name = request.form['product_name']
@@ -198,6 +273,64 @@ def calculate():
                          platform=platform, 
                          fee=fee, 
                          profit=profit)
+
+@app.route('/upgrade')
+@login_required
+def upgrade():
+    return render_template('upgrade.html', 
+                         stripe_key=STRIPE_PUBLISHABLE_KEY)
+
+
+@app.route('/create-checkout-session', methods=['POST'])
+@login_required
+def create_checkout_session():
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            customer_email=current_user.email,
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'gbp',
+                    'unit_amount': 500,  # £5.00 in pence
+                    'product_data': {
+                        'name': 'Pro Plan',
+                        'description': 'Unlimited flips + all features',
+                    },
+                    'recurring': {
+                        'interval': 'month',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=request.host_url + 'success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=request.host_url + 'upgrade',
+        )
+        return {'id': checkout_session.id}
+    except Exception as e:
+        return str(e), 403
+
+@app.route('/success')
+@login_required
+def success():
+    session_id = request.args.get('session_id')
+    
+    if session_id:
+        session = stripe.checkout.Session.retrieve(session_id)
+        customer_id = session.customer
+        
+        # Update user to Pro
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET subscription_status = ?, stripe_customer_id = ? WHERE username = ?',
+                 ('pro', customer_id, current_user.username))
+        conn.commit()
+        conn.close()
+        
+        flash('Upgrade successful! You now have unlimited flips.', 'success')
+    
+    return redirect(url_for('dashboard'))
+
 
 @app.route('/edit/<int:index>')
 @login_required
