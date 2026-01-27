@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>✅ Calculation Results</h2>
+        
+        <div class="result-item">
+            <p>📦 Product: <strong>{{ product_name }}</strong></p>
+        </div>
+        
+        <div class="result-item">
+            <p>🔢 Quantity: <strong>{{ quantity }} unit(s)</strong></p>
+        </div>
+        
+        <div class="result-item">
+            <p>💵 Cost Price (per unit): <strong>${{ cost }}</strong></p>
+            <p style="margin-top: 5px; color: #666;">Total Cost: ${{ "%.2f"|format(cost * quantity) }}</p>
+        </div>
+        
+        <div class="result-item">
+            <p>💰 Selling Price (per unit): <strong>${{ sell }}</strong></p>
+            <p style="margin-top: 5px; color: #666;">Total Revenue: ${{ "%.2f"|format(sell * quantity) }}</p>
+        </div>
+        
+        <div class="result-item">
+            <p>🏪 Platform: <strong>{{ platform.capitalize() }}</strong></p>
+        </div>
+        
+        <div class="result-item">
+            <p>📉 Platform Fee (per unit): <strong>${{ fee }}</strong></p>
+            <p style="margin-top: 5px; color: #666;">Total Fees: ${{ "%.2f"|format(fee * quantity) }}</p>
+        </div>
+        
+        <div class="result-item" {% if profit > 0 %}style="background: #d1fae5; border-left-color: #10b981;"{% else %}style="background: #fee2e2; border-left-color: #ef4444;"{% endif %}>
+            <p>
+                {% if profit > 0 %}
+                🎉 Your Profit (per unit): <span class="profit-positive">${{ profit }}</span>
+                {% else %}
+                ⚠️ Your Loss (per unit): <span class="profit-negative">${{ profit|abs }}</span>
+                {% endif %}
+            </p>
+            <p style="margin-top: 10px; font-size: 1.3em;">
+                <strong>Total Profit: 
+                    <span {% if profit > 0 %}class="profit-positive"{% else %}class="profit-negative"{% endif %}>
+                        ${{ "%.2f"|format(profit * quantity) }}
+                    </span>
+                </strong>
+            </p>
+        </div>
+        
+        <div class="links">
+            <a href="/calculator">🔄 Calculate Again</a>
+            <a href="/history">📜 View History</a>
+            <a href="/">🏠 Home</a>
+        </div>
+    </div>
+</body>
+</html>

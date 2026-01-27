@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upgrade</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>💎 Upgrade to Pro</h2>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <div class="result-item">
+                <h3>Free Plan</h3>
+                <p>✅ 10 flips per month</p>
+                <p>✅ Basic features</p>
+                <p><strong>$0/month</strong></p>
+            </div>
+            
+            <div class="result-item" style="background: #d1fae5; border: 3px solid #10b981;">
+                <h3>Pro Plan</h3>
+                <p>✅ Unlimited flips</p>
+                <p>✅ Export to Excel</p>
+                <p>✅ Priority support</p>
+                <p><strong>$5/month</strong></p>
+                <button id="checkout-button">Upgrade Now</button>
+            </div>
+        </div>
+        
+        <a href="/dashboard">← Back to Dashboard</a>
+    </div>
+    
+    <script>
+        var stripe = Stripe('{{ stripe_key }}');
+        var checkoutButton = document.getElementById('checkout-button');
+        
+        checkoutButton.addEventListener('click', function() {
+            fetch('/create-checkout-session', {
+                method: 'POST',
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(session) {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            })
+            .then(function(result) {
+                if (result.error) {
+                    alert(result.error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
