@@ -420,12 +420,23 @@ def delete(index):
 def export():
     csv_path = get_user_csv_path(current_user.username)
     
-    # Read CSV and convert to Excel
-    df = pd.read_csv(csv_path)
+    # Read CSV manually
+    import openpyxl
+    from openpyxl import Workbook
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Flip History"
+    
+    # Read CSV and write to Excel
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            ws.append(row)
     
     # Create Excel file
     excel_filename = f'flip_history_{current_user.username}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    df.to_excel(excel_filename, index=False, engine='openpyxl')
+    wb.save(excel_filename)
     
     return send_file(excel_filename, 
                     as_attachment=True,
