@@ -4,15 +4,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import os
 from datetime import datetime
-import pandas as pd
 import sqlite3
 import json
 import stripe
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
-from flask_mail import Mail, Message
 
 
 app = Flask(__name__)
@@ -22,18 +17,6 @@ app.secret_key = 'your-secret-key-here-random-string-123'
 
 stripe.api_key = 'sk_test_...'  # Use test key, not live
 STRIPE_PUBLISHABLE_KEY = 'pk_test_...'  # Use test key
-
-DATABASE_PATH = os.environ.get('DATABASE_PATH', 'users.db')
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
-if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-engine = create_engine(DATABASE_URL)
-db_session = scoped_session(sessionmaker(bind=engine))
-Base = declarative_base()
-
-
-
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -79,6 +62,15 @@ def webhook():
         pass
     
     return {'status': 'success'}
+
+@app.route('/debug')
+def debug():
+    template_dir = app.template_folder
+    if os.path.exists(template_dir):
+        files = os.listdir(template_dir)
+        return f"Template folder exists at {template_dir}. Files: {files}"
+    else:
+        return f"Template folder NOT FOUND. Looking at: {template_dir}"
 
 # User class
 class User(UserMixin):
@@ -420,12 +412,23 @@ def delete(index):
 def export():
     csv_path = get_user_csv_path(current_user.username)
     
-    # Read CSV and convert to Excel
-    df = pd.read_csv(csv_path)
+    # Read CSV manually
+    import openpyxl
+    from openpyxl import Workbook
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Flip History"
+    
+    # Read CSV and write to Excel
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            ws.append(row)
     
     # Create Excel file
     excel_filename = f'flip_history_{current_user.username}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    df.to_excel(excel_filename, index=False, engine='openpyxl')
+    wb.save(excel_filename)
     
     return send_file(excel_filename, 
                     as_attachment=True,
