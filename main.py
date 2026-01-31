@@ -53,15 +53,37 @@ def webhook():
     except stripe.error.SignatureVerificationError:
         return 'Invalid signature', 400
     
+    # Handle the event
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        # Update user subscription
+        customer_email = session.get('customer_email')
+        customer_id = session.get('customer')
+        
+        # Update user to Pro
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET subscription_status = ?, stripe_customer_id = ? WHERE email = ?',
+                 ('pro', customer_id, customer_email))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ User {customer_email} upgraded to Pro!")
         
     elif event['type'] == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        customer_id = subscription.get('customer')
+        
         # Downgrade user to free
-        pass
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET subscription_status = ? WHERE stripe_customer_id = ?',
+                 ('free', customer_id))
+        conn.commit()
+        conn.close()
+        
+        print(f"❌ Subscription cancelled for customer {customer_id}")
     
-    return {'status': 'success'}
+    return {'status': 'success'}, 200
 
 @app.route('/debug')
 def debug():
