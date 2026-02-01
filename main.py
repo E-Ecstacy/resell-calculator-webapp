@@ -144,18 +144,6 @@ def check_flip_limit(username):
     if status == 'free' and flip_count >= 10:
         return False  # Hit limit
     return True  # Can still add flips
-@app.route('/debug/user-status')
-@login_required
-def debug_user_status():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT username, email, subscription_status FROM users WHERE username = ?', (current_user.username,))
-    user = c.fetchone()
-    conn.close()
-    
-    if user:
-        return f"Username: {user[0]}<br>Email: {user[1]}<br>Subscription: {user[2]}"
-    return "User not found"
 
 @app.route('/')
 def home():
