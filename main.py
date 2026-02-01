@@ -15,8 +15,8 @@ app = Flask(__name__)
 
 app.secret_key = 'your-secret-key-here-random-string-123'
 
-stripe.api_key = 'sk_test_...'  # Use test key, not live
-STRIPE_PUBLISHABLE_KEY = 'pk_test_...'  # Use test key
+stripe.api_key = 'test'  # Use test key, not live
+STRIPE_PUBLISHABLE_KEY = 'test'  # Use test key
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -219,7 +219,18 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', username=current_user.username)
+    # Get subscription status from database
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT subscription_status FROM users WHERE username = ?', (current_user.username,))
+    result = c.fetchone()
+    conn.close()
+    
+    subscription_status = result[0] if result else 'free'
+    
+    return render_template('dashboard.html', 
+                         username=current_user.username,
+                         subscription_status=subscription_status)
 
 @app.route('/history')
 @login_required
