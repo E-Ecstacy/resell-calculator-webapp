@@ -145,6 +145,16 @@ def check_flip_limit(username):
         return False  # Hit limit
     return True  # Can still add flips
 
+@app.route('/admin/reset-all-to-free')
+def reset_all_to_free():
+    """Reset all users to free plan - DELETE THIS AFTER USE!"""
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('UPDATE users SET subscription_status = ?', ('free',))
+    count = c.rowcount
+    conn.commit()
+    conn.close()
+    return f"Reset {count} users to free plan"
 
 @app.route('/')
 def home():
@@ -173,8 +183,9 @@ def register():
         try:
             conn = sqlite3.connect('users.db')
             c = conn.cursor()
-            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                     (username, email, hashed_password))
+            # EXPLICITLY set subscription_status to 'free'
+            c.execute('INSERT INTO users (username, email, password, subscription_status) VALUES (?, ?, ?, ?)',
+                     (username, email, hashed_password, 'free'))
             conn.commit()
             conn.close()
             
