@@ -228,10 +228,16 @@ def dashboard():
     
     subscription_status = result[0] if result else 'free'
     
+    # DEBUG - This will show in Railway logs
+    print(f"========================================")
+    print(f"🔍 USER: {current_user.username}")
+    print(f"🔍 SUBSCRIPTION FROM DB: {subscription_status}")
+    print(f"========================================")
+    
     return render_template('dashboard.html', 
                          username=current_user.username,
                          subscription_status=subscription_status)
-
+                         
 @app.route('/history')
 @login_required
 def history():
