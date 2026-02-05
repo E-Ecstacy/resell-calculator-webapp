@@ -85,6 +85,19 @@ def webhook():
     
     return {'status': 'success'}, 200
 
+@app.route('/debug/all-users')
+def debug_all_users():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT username, subscription_status FROM users')
+    users = c.fetchall()
+    conn.close()
+    
+    result = "<h2>All Users:</h2>"
+    for user in users:
+        result += f"Username: {user[0]} - Subscription: {user[1]}<br>"
+    return result
+
 @app.route('/debug')
 def debug():
     template_dir = app.template_folder
