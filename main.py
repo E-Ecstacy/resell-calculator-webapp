@@ -8,10 +8,6 @@ import sqlite3
 import json
 import stripe
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
-from flask_mail import Mail, Message
 
 
 app = Flask(__name__)
@@ -19,20 +15,8 @@ app = Flask(__name__)
 
 app.secret_key = 'your-secret-key-here-random-string-123'
 
-stripe.api_key = 'sk_test_...'  # Use test key, not live
-STRIPE_PUBLISHABLE_KEY = 'pk_test_...'  # Use test key
-
-DATABASE_PATH = os.environ.get('DATABASE_PATH', 'users.db')
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
-if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-engine = create_engine(DATABASE_URL)
-db_session = scoped_session(sessionmaker(bind=engine))
-Base = declarative_base()
-
-
-
+stripe.api_key = 'test'  # Use test key, not live
+STRIPE_PUBLISHABLE_KEY = 'test'  # Use test key
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -69,15 +53,46 @@ def webhook():
     except stripe.error.SignatureVerificationError:
         return 'Invalid signature', 400
     
+    # Handle the event
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        # Update user subscription
+        customer_email = session.get('customer_email')
+        customer_id = session.get('customer')
+        
+        # Update user to Pro
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET subscription_status = ?, stripe_customer_id = ? WHERE email = ?',
+                 ('pro', customer_id, customer_email))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ User {customer_email} upgraded to Pro!")
         
     elif event['type'] == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        customer_id = subscription.get('customer')
+        
         # Downgrade user to free
-        pass
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET subscription_status = ? WHERE stripe_customer_id = ?',
+                 ('free', customer_id))
+        conn.commit()
+        conn.close()
+        
+        print(f"❌ Subscription cancelled for customer {customer_id}")
     
-    return {'status': 'success'}
+    return {'status': 'success'}, 200
+
+@app.route('/debug')
+def debug():
+    template_dir = app.template_folder
+    if os.path.exists(template_dir):
+        files = os.listdir(template_dir)
+        return f"Template folder exists at {template_dir}. Files: {files}"
+    else:
+        return f"Template folder NOT FOUND. Looking at: {template_dir}"
 
 # User class
 class User(UserMixin):
@@ -130,7 +145,6 @@ def check_flip_limit(username):
         return False  # Hit limit
     return True  # Can still add flips
 
-
 @app.route('/')
 def home():
     return render_template('home.html')
@@ -158,8 +172,9 @@ def register():
         try:
             conn = sqlite3.connect('users.db')
             c = conn.cursor()
-            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                     (username, email, hashed_password))
+            # EXPLICITLY set subscription_status to 'free'
+            c.execute('INSERT INTO users (username, email, password, subscription_status) VALUES (?, ?, ?, ?)',
+                     (username, email, hashed_password, 'free'))
             conn.commit()
             conn.close()
             
@@ -204,8 +219,25 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', username=current_user.username)
-
+    # Get subscription status from database
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT subscription_status FROM users WHERE username = ?', (current_user.username,))
+    result = c.fetchone()
+    conn.close()
+    
+    subscription_status = result[0] if result else 'free'
+    
+    # DEBUG - This will show in Railway logs
+    print(f"========================================")
+    print(f"🔍 USER: {current_user.username}")
+    print(f"🔍 SUBSCRIPTION FROM DB: {subscription_status}")
+    print(f"========================================")
+    
+    return render_template('dashboard.html', 
+                         username=current_user.username,
+                         subscription_status=subscription_status)
+                         
 @app.route('/history')
 @login_required
 def history():
