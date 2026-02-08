@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Profit Calculator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- 🔥 NEW TEMPLATE FILE - UPDATED 2026-01-29 🔥 -->
+    <div class="container">
+        <header>
+            <h1>💼 Welcome, {{ username }}!</h1>
+            <h2>🔍 DEBUG: subscription_status = {{ subscription_status }}</h2>
+            {% if subscription_status == 'free' %}
+            <div class="alert alert-warning">
+                <p>Free Plan: Limited to 10 flips. <a href="/upgrade">Upgrade to Pro</a></p>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <p>💎 Pro Plan Active - Unlimited Flips</p>
+            </div>
+            {% endif %}
+            <p style="text-align: center; color: #666;">Your Flipping Dashboard</p>
+        </header>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <main>
+            <p style="text-align: center;">Track your flips, calculate profits, and grow your business!</p>
+        </main>
+        
+        <div class="links">
+            <a href="/calculator">📊 Calculate Profit</a>
+            <a href="/history">📜 View History</a>
+            <a href="/logout">🚪 Logout</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -239,15 +239,11 @@ def dashboard():
     result = c.fetchone()
     conn.close()
     
-    # FORCE IT TO FREE FOR TESTING
-    subscription_status = 'free'
+    subscription_status = 'free'  # FORCED
     
-    print(f"========================================")
-    print(f"🔍 USER: {current_user.username}")
     print(f"🔍 FORCING subscription_status to: {subscription_status}")
-    print(f"========================================")
     
-    return render_template('dashboard.html', 
+    return render_template('dashboard2.html',  # ← CHANGED TO dashboard2.html
                          username=current_user.username,
                          subscription_status=subscription_status)
                          
