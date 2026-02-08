@@ -232,22 +232,17 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Get subscription status from database
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('SELECT subscription_status FROM users WHERE username = ?', (current_user.username,))
     result = c.fetchone()
     conn.close()
     
-    # FORCE IT TO FREE FOR TESTING
-    subscription_status = 'free'
+    subscription_status = result[0] if result else 'free'
     
-    print(f"========================================")
-    print(f"🔍 USER: {current_user.username}")
-    print(f"🔍 FORCING subscription_status to: {subscription_status}")
-    print(f"========================================")
+    print(f"🔍 subscription_status: {subscription_status}")
     
-    return render_template('dashboard.html', 
+    return render_template('dashboard2.html',  # Using dashboard2.html
                          username=current_user.username,
                          subscription_status=subscription_status)
                          
