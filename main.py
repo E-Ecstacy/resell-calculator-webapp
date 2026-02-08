@@ -85,6 +85,19 @@ def webhook():
     
     return {'status': 'success'}, 200
 
+@app.route('/debug/all-users')
+def debug_all_users():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT username, subscription_status FROM users')
+    users = c.fetchall()
+    conn.close()
+    
+    result = "<h2>All Users:</h2>"
+    for user in users:
+        result += f"Username: {user[0]} - Subscription: {user[1]}<br>"
+    return result
+
 @app.route('/debug')
 def debug():
     template_dir = app.template_folder
@@ -226,12 +239,12 @@ def dashboard():
     result = c.fetchone()
     conn.close()
     
-    subscription_status = result[0] if result else 'free'
+    # FORCE IT TO FREE FOR TESTING
+    subscription_status = 'free'
     
-    # DEBUG - This will show in Railway logs
     print(f"========================================")
     print(f"🔍 USER: {current_user.username}")
-    print(f"🔍 SUBSCRIPTION FROM DB: {subscription_status}")
+    print(f"🔍 FORCING subscription_status to: {subscription_status}")
     print(f"========================================")
     
     return render_template('dashboard.html', 
