@@ -7,18 +7,19 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+    <!-- DEBUG: Template updated at 2026-01-29 21:30 -->
     <div class="container">
         <header>
             <h1>💼 Welcome, {{ username }}!</h1>
-            {% if current_user.subscription_status == 'free' %}
-<div class="alert alert-warning">
-    <p>Free Plan: Limited to 10 flips. <a href="/upgrade">Upgrade to Pro</a></p>
-</div>
-{% else %}
-<div class="alert alert-success">
-    <p>💎 Pro Plan Active - Unlimited Flips</p>
-</div>
-{% endif %}
+            {% if subscription_status == 'free' %}
+            <div class="alert alert-warning">
+                <p>Free Plan: Limited to 10 flips. <a href="/upgrade">Upgrade to Pro</a></p>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <p>💎 Pro Plan Active - Unlimited Flips</p>
+            </div>
+            {% endif %}
             <p style="text-align: center; color: #666;">Your Flipping Dashboard</p>
         </header>
         

@@ -239,12 +239,12 @@ def dashboard():
     result = c.fetchone()
     conn.close()
     
-    subscription_status = result[0] if result else 'free'
+    # FORCE IT TO FREE FOR TESTING
+    subscription_status = 'free'
     
-    # DEBUG - This will show in Railway logs
     print(f"========================================")
     print(f"🔍 USER: {current_user.username}")
-    print(f"🔍 SUBSCRIPTION FROM DB: {subscription_status}")
+    print(f"🔍 FORCING subscription_status to: {subscription_status}")
     print(f"========================================")
     
     return render_template('dashboard.html', 
